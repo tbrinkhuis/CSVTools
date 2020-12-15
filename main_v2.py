@@ -31,7 +31,7 @@ class cat:
         if prompt:
             self.selected_dir = os.chdir(filedialog.askdirectory(title = "Select the folder that contains your CSV trend files"))
         # self.selected_dir = os.chdir(os.getcwd())
-        w_lb_files.set(self.filenames())
+        w_lb_files_var.set(self.filenames())
 
     def filenames(self): # get csv file list from the cur dir.
         self.csv_list = [i for i in glob.glob('*.{}'.format('csv'))]
@@ -54,6 +54,15 @@ class cat:
 
     def open_dir(self): # open the current dir
             os.startfile(os.curdir)
+
+    def files_to_columns(self):
+        self.current_file_sel = w_lb_columns.curselection() # get a list of selected files
+        if self.current_file_sel: # if something is selected
+            self.get_data(self.current_file_sel) # call get data function with the list of selected files
+            files_in_dir = self.filenames() # return a list of CSV files in the CWD
+        else:
+            print('nothing has been selected...')
+            messagebox.showinfo("User Error", "Select a file to load!")
 
     def get_data(self, files): # get all of the data, concatinate and sort
         rows_to_skip = int(round(w_spn_header_row.get())) # get the spinbox value and sub 1 since we need to skip 1 less row than the header
@@ -138,37 +147,37 @@ w_b_select_all = Button(w_col_1, text='Select all', width=13)
 w_b_select_all.grid(row=2, column=0, padx=5, pady=5)
 
 # Import Button
-w_b_import = Button(w_col_0, text='Import', width=13)
-b_import.grid(row=2, column=1, padx=5, pady=5)
+w_b_import = Button(w_col_0, text='Import', width=13, command=m.get_data)
+w_b_import.grid(row=2, column=1, padx=5, pady=5)
 
 # Files listbox
 w_lb_files_var = tk.StringVar()
-w_lb_files = tk.Listbox(w_col_0, listvariable=files_lb_var, selectmode=tk.MULTIPLE, height=29, width=30, exportselection=False)
+w_lb_files = tk.Listbox(w_col_0, listvariable=w_lb_files_var, selectmode=tk.MULTIPLE, height=29, width=30, exportselection=False)
 w_lb_files.grid(row=3, column=0, columnspan=2, rowspan=16, padx=5, pady=5, sticky=(N,S,E,W))
 
 
 # Col 3
 # Select all columns in listbox
-w_b_select_all = Button(w_col_1, text='Select all', width=28, command=m.select_all_col)
+w_b_select_all = Button(w_col_1, text='Select all', width=28)
 w_b_select_all.grid(row=0, column=3, padx=5, pady=5, columnspan=2)
 
 # Listbox for file columns
 w_lb_columns_var = tk.StringVar()
-w_lb_columns = tk.Listbox(w_col_1, listvariable=columns_lb_var, selectmode=tk.MULTIPLE, width=30, exportselection=False)
+w_lb_columns = tk.Listbox(w_col_1, listvariable=w_lb_columns_var, selectmode=tk.MULTIPLE, width=30, exportselection=False)
 w_lb_columns.grid(row=1, column=3, columnspan=2, rowspan=18, padx=5, pady=5, sticky=(N,S,E,W))
 
 # Col 5 Row 0
 # Save selected button
-w_b_save = Button(w_col_2, text='Save Selected', width=button_width, command=m.save_selection)
+w_b_save = Button(w_col_2, text='Save Selected', width=button_width)
 w_b_save.grid(row=0, column=5, padx=5, pady=5)
 
 # Graph button
-w_b_graph = Button(w_col_2, text='Graph Selected', width=button_width, command=m.stop)
+w_b_graph = Button(w_col_2, text='Graph Selected', width=button_width)
 w_b_graph.grid(row=0, column=6, padx=5, pady=5)
 
 # Gen Alpha Button
 w_b_alpha = Button(w_col_2, text='Find Alpha', width=button_width)
-b_alpha.grid(row=0, column=7, padx=5, pady=5)
+w_b_alpha.grid(row=0, column=7, padx=5, pady=5)
 
 # Save Alpha Report
 w_b_alpha_report = Button(w_col_2, text='Save Alpha Report', width=button_width)
@@ -183,14 +192,14 @@ w_date_col_lbl = Label(w_col_3,text='Date Col:', anchor=E, width=lbl_width)
 w_date_col_lbl.grid(row=2, column=5, padx=5, pady=5)
 
 w_dd_date_col_var = tk.StringVar
-w_dd_date_col = ttk.Combobox(w_col_3, textvariable=dd_date_col_var, width=combo_col_width, postcommand=m.stop) # , textvariable=var3
+w_dd_date_col = ttk.Combobox(w_col_3, textvariable=w_dd_date_col_var, width=combo_col_width) # , textvariable=var3
 w_dd_date_col.grid(row=2, column=6, padx=5, pady=5)
 
 w_time_col_lbl = Label(w_col_3, text='Time Col:', anchor=E, width=lbl_width)
 w_time_col_lbl.grid(row=2, column=7, padx=5, pady=5)
 
 w_dd_time_col_var = tk.StringVar
-w_dd_time_col = ttk.Combobox(w_col_3, textvariable=dd_time_col_var, value=15, width=combo_col_width)
+w_dd_time_col = ttk.Combobox(w_col_3, textvariable=w_dd_time_col_var, value=15, width=combo_col_width)
 w_dd_time_col.grid(row=2, column=8, padx=5, pady=5)
 
 
@@ -198,7 +207,7 @@ w_sample_rate_lbl = Label(w_col_3, text='Sample Rate:', anchor=E, width=lbl_widt
 w_sample_rate_lbl.grid(row=3, column=5, padx=5, pady=5)
 
 w_dd_sample_rate_var = tk.StringVar
-w_dd_sample_rate = ttk.Combobox(w_col_3, textvariable=dd_sample_rate_var, value=['30s','15s','10s','5s','1s','500ms','250ms','100ms'], width=combo_width)
+w_dd_sample_rate = ttk.Combobox(w_col_3, textvariable=w_dd_sample_rate_var, value=['30s','15s','10s','5s','1s','500ms','250ms','100ms'], width=combo_width)
 w_dd_sample_rate.grid(row=3, column=6, padx=5, pady=5)
 
 
@@ -206,7 +215,7 @@ w_fill_type_lbl = Label(w_col_3, text='Fill Method:', anchor=E, width=lbl_width)
 w_fill_type_lbl.grid(row=3, column=7, padx=5, pady=5)
 
 w_dd_fill_type_var = tk.StringVar
-w_dd_fill_type = ttk.Combobox(w_col_3, textvariable=dd_fill_type_var, value=['interpolate', 'backfill', 'forward fill', 'Zero Fill', 'NaN Fill'], width=combo_width)
+w_dd_fill_type = ttk.Combobox(w_col_3, textvariable=w_dd_fill_type_var, value=['interpolate', 'backfill', 'forward fill', 'Zero Fill', 'NaN Fill'], width=combo_width)
 w_dd_fill_type.grid(row=3, column=8, padx=5, pady=5)
 
 
@@ -217,14 +226,14 @@ w_target_col_lbl = Label(w_col_3, text='Target Col:', anchor=E, width=lbl_width)
 w_target_col_lbl.grid(row=5, column=5, padx=5, pady=5)
 
 w_dd_target_col_var = tk.StringVar
-w_dd_target_col = ttk.Combobox(w_col_3, textvariable=dd_target_col_var, value=15, width=combo_col_width)
+w_dd_target_col = ttk.Combobox(w_col_3, textvariable=w_dd_target_col_var, value=15, width=combo_col_width)
 w_dd_target_col.grid(row=5, column=6, padx=5, pady=5)
 
 w_temp_col_lbl = Label(w_col_3, text='Temp Col:', anchor=E, width=lbl_width)
 w_temp_col_lbl.grid(row=5, column=7, padx=5, pady=5)
 
 w_dd_temp_col_var = tk.StringVar
-w_dd_temp_col = ttk.Combobox(w_col_3, textvariable=dd_temp_col_var, value=15, width=combo_col_width)
+w_dd_temp_col = ttk.Combobox(w_col_3, textvariable=w_dd_temp_col_var, value=15, width=combo_col_width)
 w_dd_temp_col.grid(row=5, column=8, padx=5, pady=5)
 
 w_lower_b_lbl = Label(w_col_3, text='Lower Boundary: ', anchor=E, width=lbl_width)
