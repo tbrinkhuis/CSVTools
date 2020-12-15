@@ -42,8 +42,54 @@ class cat:
             list_to_change[list_to_change.index(i)] = list_to_change[list_to_change.index(i)].upper()
         return list_to_change
 
+    def lst_to_search(list_to_search): # Take a single dem. list and capitalize everything
+        for i in list_to_search: 
+            list_to_search[list_to_search.index(i)] = list_to_search[list_to_search.index(i)].upper()
+        return list_to_search
+
     def open_dir(self): # open the current dir
             os.startfile(os.curdir)
+
+    def get_data(self, files): # get all of the data, concatinate and sort
+        rows_to_skip = int(w_spn_header_row.get()) # get the spinbox value and sub 1 since we need to skip 1 less row than the header
+        w_lb_columns.delete(0, 'end') # clear the listbox
+
+        df = [pd.read_csv(w_lb_files.get(f), skiprows=(rows_to_skip)) for f in files] # read all of the csv files selected
+
+        if df: # got df?
+            self.concat_df = pd.concat(df, sort=False) # combine all csv files
+            self.header = list(self.concat_df) # get the header of the concatinated dataframe
+
+            print(self.header)
+
+            self.header = self.lst_to_upper(self.header) # upper case everything in da list
+            
+            #search the header series for the keyword, if it is present, then search every header item
+            if 'TIME' in self.header: 
+                for i in self.header: #for every item in the self.header
+                    if 'TIME' in i: # search for the keyword in every list item contained in i
+                        self.time_index_inf = i # return the index of the list item that matched
+
+            if 'DATE' in self.header: 
+                for i in self.header: #for every item in the self.header
+                    if 'DATE' in i: # search for the keyword in every list item contained in i
+
+                        self.date_index_inf = i # return the index of the list item that matched
+
+            self.concat_df = self.concat_df[0:] # remove the header for replacement
+            self.concat_df.columns = self.header # load in the new header that is all caps. for searching reasons down the line
+
+
+            # sorted_df = concat_df.sort_values(by='TIME') # sort the dataframe based on the timestamp col
+            # concat_df_header = list(concat_df)
+            w_lb_columns_var.set(self.header) # update the columns listbox. Done with the sorted DF so all self.header entrys are unique
+            w_dd_date_col['value'] = self.header
+            w_dd_time_col['value'] = self.header
+            w_dd_target_col['value'] = self.header
+            w_dd_temp_col['value'] = self.header
+        else:
+            print('Something happened while trying to read the selected file. Make sure eveything \
+                selected starts on the same row and have the same timestamp headers')
 
 
 
@@ -74,9 +120,9 @@ w_b_sel_dir.grid(row=0, column=0, columnspan=2, padx=5, pady=5)
 w_header_row_lbl = Label(col_0, text='Header row:', anchor=E, width=14)
 w_header_row_lbl.grid(row=1,column=0, padx=5, pady=5)
 
-w_header_row_spn = Spinbox(col_0, from_=0, to=20, width=5, textvariable=14) 
-w_header_row_spn.grid(row=1,column=1, padx=5, pady=5)
-w_header_row_spn.set(14)
+w_spn_header_row = Spinbox(col_0, from_=0, to=20, width=5, textvariable=14) 
+w_spn_header_row.grid(row=1,column=1, padx=5, pady=5)
+w_spn_header_row.set(14)
 
 # Select all files in listox
 w_b_select_all = Button(col_1, text='Select all', width=13, command=m.select_all_files)
@@ -87,9 +133,9 @@ w_b_import = Button(col_0, text='Import', width=13, command=m.files_to_columns)
 b_import.grid(row=2, column=1, padx=5, pady=5)
 
 # Files listbox
-w_files_lb_var = tk.StringVar()
-w_files_lb = tk.Listbox(col_0, listvariable=files_lb_var, selectmode=tk.MULTIPLE, height=29, width=30, exportselection=False)
-w_files_lb.grid(row=3, column=0, columnspan=2, rowspan=16, padx=5, pady=5, sticky=(N,S,E,W))
+w_lb_files_var = tk.StringVar()
+w_lb_files = tk.Listbox(col_0, listvariable=files_lb_var, selectmode=tk.MULTIPLE, height=29, width=30, exportselection=False)
+w_lb_files.grid(row=3, column=0, columnspan=2, rowspan=16, padx=5, pady=5, sticky=(N,S,E,W))
 
 
 # Col 3
@@ -98,9 +144,9 @@ w_b_select_all = Button(col_1, text='Select all', width=28, command=m.select_all
 w_b_select_all.grid(row=0, column=3, padx=5, pady=5, columnspan=2)
 
 # Listbox for file columns
-w_columns_lb_var = tk.StringVar()
-w_columns_lb = tk.Listbox(col_1, listvariable=columns_lb_var, selectmode=tk.MULTIPLE, width=30, exportselection=False)
-w_columns_lb.grid(row=1, column=3, columnspan=2, rowspan=18, padx=5, pady=5, sticky=(N,S,E,W))
+w_lb_columns_var = tk.StringVar()
+w_lb_columns = tk.Listbox(col_1, listvariable=columns_lb_var, selectmode=tk.MULTIPLE, width=30, exportselection=False)
+w_lb_columns.grid(row=1, column=3, columnspan=2, rowspan=18, padx=5, pady=5, sticky=(N,S,E,W))
 
 # Col 5 Row 0
 # Save selected button
