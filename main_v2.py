@@ -41,26 +41,27 @@ class cat:
         for i in list_to_change: 
             list_to_change[list_to_change.index(i)] = list_to_change[list_to_change.index(i)].upper()
         return list_to_change
-
-    def lst_to_search(list_to_search): # Take a single dem. list and capitalize everything
-        for i in list_to_search: 
-            list_to_search[list_to_search.index(i)] = list_to_search[list_to_search.index(i)].upper()
-        return list_to_search
+    def lst_search(list_to_search, item): # Take a single dem. list and capitalize everything
+        item = item.upper()
+        for list_item in list_to_search:
+            print(f'{list_item} = {item}') 
+            if item in list_item.upper():
+                return list_item
 
     def open_dir(self): # open the current dir
             os.startfile(os.curdir)
 
     def get_data(self, files): # get all of the data, concatinate and sort
-        rows_to_skip = int(w_spn_header_row.get()) # get the spinbox value and sub 1 since we need to skip 1 less row than the header
+        rows_to_skip = int(round(w_spn_header_row.get())) # get the spinbox value and sub 1 since we need to skip 1 less row than the header
         w_lb_columns.delete(0, 'end') # clear the listbox
 
         df = [pd.read_csv(w_lb_files.get(f), skiprows=(rows_to_skip)) for f in files] # read all of the csv files selected
 
         if df: # got df?
-            self.concat_df = pd.concat(df, sort=False) # combine all csv files
+            self.concat_df = pd.concat(df, sort=False) # combine all csv files. This should combine any identical headers
             self.header = list(self.concat_df) # get the header of the concatinated dataframe
 
-            print(self.header)
+            # print(self.header)
 
             self.header = self.lst_to_upper(self.header) # upper case everything in da list
             
