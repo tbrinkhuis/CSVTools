@@ -31,7 +31,7 @@ class cat:
         if prompt:
             self.selected_dir = os.chdir(filedialog.askdirectory(title = "Select the folder that contains your CSV trend files"))
         # self.selected_dir = os.chdir(os.getcwd())
-        w_files_lb.set(self.filenames())
+        w_lb_files.set(self.filenames())
 
     def filenames(self): # get csv file list from the cur dir.
         self.csv_list = [i for i in glob.glob('*.{}'.format('csv'))]
@@ -41,12 +41,16 @@ class cat:
         for i in list_to_change: 
             list_to_change[list_to_change.index(i)] = list_to_change[list_to_change.index(i)].upper()
         return list_to_change
-    def lst_search(list_to_search, item): # Take a single dem. list and capitalize everything
+
+    def lst_search(self, list_to_search, item): # Take a single dem. list and capitalize everything
         item = item.upper()
-        for list_item in list_to_search:
-            print(f'{list_item} = {item}') 
-            if item in list_item.upper():
-                return list_item
+        try:
+            for list_item in list_to_search:
+                print(f'{list_item} = {item}') 
+                if item in list_item.upper():
+                    return list_item
+        except:
+            print('Something went wrong in the lst_search method.')
 
     def open_dir(self): # open the current dir
             os.startfile(os.curdir)
@@ -54,43 +58,47 @@ class cat:
     def get_data(self, files): # get all of the data, concatinate and sort
         rows_to_skip = int(round(w_spn_header_row.get())) # get the spinbox value and sub 1 since we need to skip 1 less row than the header
         w_lb_columns.delete(0, 'end') # clear the listbox
-
-        df = [pd.read_csv(w_lb_files.get(f), skiprows=(rows_to_skip)) for f in files] # read all of the csv files selected
+        try:
+            df = [pd.read_csv(w_lb_files.get(f), skiprows=(rows_to_skip)) for f in files] # read all of the csv files selected
+        except:
+            print('Something went wrong in method get_data. The program was unable to read the selected file')
+            messagebox.showerror(title='Failed to read files', message='Something went wrong in method get_data. The program was unable to read the selected file.')
 
         if df: # got df?
-            self.concat_df = pd.concat(df, sort=False) # combine all csv files. This should combine any identical headers
-            self.header = list(self.concat_df) # get the header of the concatinated dataframe
 
-            # print(self.header)
+            try:
+                self.concat_df = pd.concat(df, sort=False) # combine all csv files. This should combine any identical headers
+                self.header = list(self.concat_df) # get the header of the concatinated dataframe
 
-            self.header = self.lst_to_upper(self.header) # upper case everything in da list
-            
-            #search the header series for the keyword, if it is present, then search every header item
-            if 'TIME' in self.header: 
-                for i in self.header: #for every item in the self.header
-                    if 'TIME' in i: # search for the keyword in every list item contained in i
-                        self.time_index_inf = i # return the index of the list item that matched
+                # print(self.header)
 
-            if 'DATE' in self.header: 
-                for i in self.header: #for every item in the self.header
-                    if 'DATE' in i: # search for the keyword in every list item contained in i
+                self.header = self.lst_to_upper(self.header) # upper case everything in da list
+                self.concat_df = self.concat_df[0:] # remove the header for replacement
+                self.concat_df.columns = self.header # load in the new header that is all caps. for searching reasons down the line
 
-                        self.date_index_inf = i # return the index of the list item that matched
+        
+                w_lb_columns_var.set(self.header) # update the columns listbox. Done with the sorted DF so all self.header entrys are unique
+                w_dd_date_col['value'] = self.header
+                w_dd_time_col['value'] = self.header
+                w_dd_target_col['value'] = self.header
+                w_dd_temp_col['value'] = self.header
 
-            self.concat_df = self.concat_df[0:] # remove the header for replacement
-            self.concat_df.columns = self.header # load in the new header that is all caps. for searching reasons down the line
+                # If the dat or time search came back with results, change the drop downs to those columns so the user does not have to
+                self.header_date_col = self.lst_search(self.header, 'DATE')
+                if self.header_date_col:
+                    w_dd_date_col.set(self.header_date_col)
 
+                self.header_time_col = self.lst_search(self.header, 'TIME')
+                if self.header_time_col:
+                    w_dd_time_col.set(self.header_time_col)
+            except:
+                print('Something went wrong in get_data method. The program was unable to concatinate the dataframes')
+                messagebox.showerror(title='Failed to concatinate files', message='Something went wrong in get_data method. The program was unable to concatinate the files. This is usualy caused by combining files that do not share the same data structure.')
 
-            # sorted_df = concat_df.sort_values(by='TIME') # sort the dataframe based on the timestamp col
-            # concat_df_header = list(concat_df)
-            w_lb_columns_var.set(self.header) # update the columns listbox. Done with the sorted DF so all self.header entrys are unique
-            w_dd_date_col['value'] = self.header
-            w_dd_time_col['value'] = self.header
-            w_dd_target_col['value'] = self.header
-            w_dd_temp_col['value'] = self.header
         else:
             print('Something happened while trying to read the selected file. Make sure eveything \
                 selected starts on the same row and have the same timestamp headers')
+            messagebox.showerror(title='Nothing in DF', message='Something went wrong in get_data method. While the program was able to read the files, nothing seems to be in the dataframe.')
 
 
 
@@ -114,153 +122,153 @@ w_col_3 = Frame(window).grid(row=2, column=5,ipady=5,ipadx=5,padx=5,pady=5,colum
 # Col 0
 
 # Select Dir button
-w_b_sel_dir = Button(col_0, text='Select Directory', width=28, command=m.sd)
+w_b_sel_dir = Button(w_col_0, text='Select Directory', width=28, command=m.sd)
 w_b_sel_dir.grid(row=0, column=0, columnspan=2, padx=5, pady=5)
 
 # Header row Label and spinbox
-w_header_row_lbl = Label(col_0, text='Header row:', anchor=E, width=14)
+w_header_row_lbl = Label(w_col_0, text='Header row:', anchor=E, width=14)
 w_header_row_lbl.grid(row=1,column=0, padx=5, pady=5)
 
-w_spn_header_row = Spinbox(col_0, from_=0, to=20, width=5, textvariable=14) 
+w_spn_header_row = Spinbox(w_col_0, from_=0, to=20, width=5, textvariable=14) 
 w_spn_header_row.grid(row=1,column=1, padx=5, pady=5)
 w_spn_header_row.set(14)
 
 # Select all files in listox
-w_b_select_all = Button(col_1, text='Select all', width=13, command=m.select_all_files)
+w_b_select_all = Button(w_col_1, text='Select all', width=13)
 w_b_select_all.grid(row=2, column=0, padx=5, pady=5)
 
 # Import Button
-w_b_import = Button(col_0, text='Import', width=13, command=m.files_to_columns)
+w_b_import = Button(w_col_0, text='Import', width=13)
 b_import.grid(row=2, column=1, padx=5, pady=5)
 
 # Files listbox
 w_lb_files_var = tk.StringVar()
-w_lb_files = tk.Listbox(col_0, listvariable=files_lb_var, selectmode=tk.MULTIPLE, height=29, width=30, exportselection=False)
+w_lb_files = tk.Listbox(w_col_0, listvariable=files_lb_var, selectmode=tk.MULTIPLE, height=29, width=30, exportselection=False)
 w_lb_files.grid(row=3, column=0, columnspan=2, rowspan=16, padx=5, pady=5, sticky=(N,S,E,W))
 
 
 # Col 3
 # Select all columns in listbox
-w_b_select_all = Button(col_1, text='Select all', width=28, command=m.select_all_col)
+w_b_select_all = Button(w_col_1, text='Select all', width=28, command=m.select_all_col)
 w_b_select_all.grid(row=0, column=3, padx=5, pady=5, columnspan=2)
 
 # Listbox for file columns
 w_lb_columns_var = tk.StringVar()
-w_lb_columns = tk.Listbox(col_1, listvariable=columns_lb_var, selectmode=tk.MULTIPLE, width=30, exportselection=False)
+w_lb_columns = tk.Listbox(w_col_1, listvariable=columns_lb_var, selectmode=tk.MULTIPLE, width=30, exportselection=False)
 w_lb_columns.grid(row=1, column=3, columnspan=2, rowspan=18, padx=5, pady=5, sticky=(N,S,E,W))
 
 # Col 5 Row 0
 # Save selected button
-w_b_save = Button(col_2, text='Save Selected', width=button_width, command=m.save_selection)
+w_b_save = Button(w_col_2, text='Save Selected', width=button_width, command=m.save_selection)
 w_b_save.grid(row=0, column=5, padx=5, pady=5)
 
 # Graph button
-w_b_graph = Button(col_2, text='Graph Selected', width=button_width, command=m.stop)
+w_b_graph = Button(w_col_2, text='Graph Selected', width=button_width, command=m.stop)
 w_b_graph.grid(row=0, column=6, padx=5, pady=5)
 
 # Gen Alpha Button
-w_b_alpha = Button(col_2, text='Find Alpha', width=button_width)
+w_b_alpha = Button(w_col_2, text='Find Alpha', width=button_width)
 b_alpha.grid(row=0, column=7, padx=5, pady=5)
 
 # Save Alpha Report
-w_b_alpha_report = Button(col_2, text='Save Alpha Report', width=button_width)
+w_b_alpha_report = Button(w_col_2, text='Save Alpha Report', width=button_width)
 w_b_alpha_report.grid(row=0, column=8, padx=5, pady=5)
 
 # Col 5 Row 1
 
-w_sep_settings = Label(col_3, text='----------Settings----------------------------------------------------------------------------------------', width=72)
+w_sep_settings = Label(w_col_3, text='----------Settings----------------------------------------------------------------------------------------', width=72)
 w_sep_settings.grid(row=1, column=5, padx=5, pady=5, columnspan=5)
 
-w_date_col_lbl = Label(col_3,text='Date Col:', anchor=E, width=lbl_width)
+w_date_col_lbl = Label(w_col_3,text='Date Col:', anchor=E, width=lbl_width)
 w_date_col_lbl.grid(row=2, column=5, padx=5, pady=5)
 
 w_dd_date_col_var = tk.StringVar
-w_dd_date_col = ttk.Combobox(col_3, textvariable=dd_date_col_var, width=combo_col_width, postcommand=m.stop) # , textvariable=var3
+w_dd_date_col = ttk.Combobox(w_col_3, textvariable=dd_date_col_var, width=combo_col_width, postcommand=m.stop) # , textvariable=var3
 w_dd_date_col.grid(row=2, column=6, padx=5, pady=5)
 
-w_time_col_lbl = Label(col_3, text='Time Col:', anchor=E, width=lbl_width)
+w_time_col_lbl = Label(w_col_3, text='Time Col:', anchor=E, width=lbl_width)
 w_time_col_lbl.grid(row=2, column=7, padx=5, pady=5)
 
 w_dd_time_col_var = tk.StringVar
-w_dd_time_col = ttk.Combobox(col_3, textvariable=dd_time_col_var, value=15, width=combo_col_width)
+w_dd_time_col = ttk.Combobox(w_col_3, textvariable=dd_time_col_var, value=15, width=combo_col_width)
 w_dd_time_col.grid(row=2, column=8, padx=5, pady=5)
 
 
-w_sample_rate_lbl = Label(col_3, text='Sample Rate:', anchor=E, width=lbl_width)
+w_sample_rate_lbl = Label(w_col_3, text='Sample Rate:', anchor=E, width=lbl_width)
 w_sample_rate_lbl.grid(row=3, column=5, padx=5, pady=5)
 
 w_dd_sample_rate_var = tk.StringVar
-w_dd_sample_rate = ttk.Combobox(col_3, textvariable=dd_sample_rate_var, value=['30s','15s','10s','5s','1s','500ms','250ms','100ms'], width=combo_width)
+w_dd_sample_rate = ttk.Combobox(w_col_3, textvariable=dd_sample_rate_var, value=['30s','15s','10s','5s','1s','500ms','250ms','100ms'], width=combo_width)
 w_dd_sample_rate.grid(row=3, column=6, padx=5, pady=5)
 
 
-w_fill_type_lbl = Label(col_3, text='Fill Method:', anchor=E, width=lbl_width)
+w_fill_type_lbl = Label(w_col_3, text='Fill Method:', anchor=E, width=lbl_width)
 w_fill_type_lbl.grid(row=3, column=7, padx=5, pady=5)
 
 w_dd_fill_type_var = tk.StringVar
-w_dd_fill_type = ttk.Combobox(col_3, textvariable=dd_fill_type_var, value=['interpolate', 'backfill', 'forward fill', 'Zero Fill', 'NaN Fill'], width=combo_width)
+w_dd_fill_type = ttk.Combobox(w_col_3, textvariable=dd_fill_type_var, value=['interpolate', 'backfill', 'forward fill', 'Zero Fill', 'NaN Fill'], width=combo_width)
 w_dd_fill_type.grid(row=3, column=8, padx=5, pady=5)
 
 
-w_sep_alpha_settings = Label(col_3, text='----------Alpha Settings----------------------------------------------------------------------------------', width=72)
+w_sep_alpha_settings = Label(w_col_3, text='----------Alpha Settings----------------------------------------------------------------------------------', width=72)
 w_sep_alpha_settings.grid(row=4, column=5, padx=5, pady=5, columnspan=5)
 
-w_target_col_lbl = Label(col_3, text='Target Col:', anchor=E, width=lbl_width)
+w_target_col_lbl = Label(w_col_3, text='Target Col:', anchor=E, width=lbl_width)
 w_target_col_lbl.grid(row=5, column=5, padx=5, pady=5)
 
 w_dd_target_col_var = tk.StringVar
-w_dd_target_col = ttk.Combobox(col_3, textvariable=dd_target_col_var, value=15, width=combo_col_width)
+w_dd_target_col = ttk.Combobox(w_col_3, textvariable=dd_target_col_var, value=15, width=combo_col_width)
 w_dd_target_col.grid(row=5, column=6, padx=5, pady=5)
 
-w_temp_col_lbl = Label(col_3, text='Temp Col:', anchor=E, width=lbl_width)
+w_temp_col_lbl = Label(w_col_3, text='Temp Col:', anchor=E, width=lbl_width)
 w_temp_col_lbl.grid(row=5, column=7, padx=5, pady=5)
 
 w_dd_temp_col_var = tk.StringVar
-w_dd_temp_col = ttk.Combobox(col_3, textvariable=dd_temp_col_var, value=15, width=combo_col_width)
+w_dd_temp_col = ttk.Combobox(w_col_3, textvariable=dd_temp_col_var, value=15, width=combo_col_width)
 w_dd_temp_col.grid(row=5, column=8, padx=5, pady=5)
 
-w_lower_b_lbl = Label(col_3, text='Lower Boundary: ', anchor=E, width=lbl_width)
+w_lower_b_lbl = Label(w_col_3, text='Lower Boundary: ', anchor=E, width=lbl_width)
 w_lower_b_lbl.grid(row=6, column=5, padx=5, pady=5)
 
-w_txt_lower_b = tk.Text(col_3, height=1, width=text_width, )
+w_txt_lower_b = tk.Text(w_col_3, height=1, width=text_width, )
 w_txt_lower_b.grid(row=6, column=6, padx=5, pady=5)
 w_txt_lower_b.insert(tk.INSERT,-1)
 
-w_upper_b_lbl = Label(col_3, text='Upper Boundary: ', anchor=E, width=lbl_width)
+w_upper_b_lbl = Label(w_col_3, text='Upper Boundary: ', anchor=E, width=lbl_width)
 w_upper_b_lbl.grid(row=6, column=7, padx=5, pady=5)
 
-w_txt_upper_b = tk.Text(col_3, height=1, width=text_width)
+w_txt_upper_b = tk.Text(w_col_3, height=1, width=text_width)
 w_txt_upper_b.grid(row=6, column=8, padx=5, pady=5)
 w_txt_upper_b.insert(tk.INSERT,2)
 
 
-w_div_lbl = Label(col_3, text='Divisions: ', anchor=E, width=lbl_width)
+w_div_lbl = Label(w_col_3, text='Divisions: ', anchor=E, width=lbl_width)
 w_div_lbl.grid(row=7, column=5, padx=5, pady=5)
 
-w_txt_div = tk.Text(col_3, height=1, width=text_width)
+w_txt_div = tk.Text(w_col_3, height=1, width=text_width)
 w_txt_div.grid(row=7, column=6, padx=5, pady=5)
 w_txt_div.insert(tk.INSERT,20)
 
-w_max_cycles_lbl = Label(col_3, text='Maximum Cycles: ', anchor=E, width=lbl_width)
+w_max_cycles_lbl = Label(w_col_3, text='Maximum Cycles: ', anchor=E, width=lbl_width)
 w_max_cycles_lbl.grid(row=7, column=7, padx=5, pady=5)
 
-w_txt_max_cycles = tk.Text(col_3, height=1, width=text_width)
+w_txt_max_cycles = tk.Text(w_col_3, height=1, width=text_width)
 w_txt_max_cycles.grid(row=7, column=8, padx=5, pady=5)
 w_txt_max_cycles.insert(tk.INSERT,10)
 
 
-w_STDEV_lbl = Label(col_3, text='STDEV Ceiling: ', anchor=E, width=lbl_width)
+w_STDEV_lbl = Label(w_col_3, text='STDEV Ceiling: ', anchor=E, width=lbl_width)
 w_STDEV_lbl.grid(row=8, column=5, padx=5, pady=5)
 
-w_txt_STDEV = tk.Text(col_3, height=1, width=text_width)
+w_txt_STDEV = tk.Text(w_col_3, height=1, width=text_width)
 w_txt_STDEV.grid(row=8, column=6, padx=5, pady=5)
 w_txt_STDEV.insert(tk.INSERT,0.0001)
 
 
-w_offset_lbl = Label(col_3, text='Offset: ', anchor=E, width=lbl_width)
+w_offset_lbl = Label(w_col_3, text='Offset: ', anchor=E, width=lbl_width)
 w_offset_lbl.grid(row=8, column=7, padx=5, pady=5)
 
-w_txt_offset = tk.Text(col_3, height=1, width=text_width)
+w_txt_offset = tk.Text(w_col_3, height=1, width=text_width)
 w_txt_offset.grid(row=8, column=8, padx=5, pady=5)
 w_txt_offset.insert(tk.INSERT,0.00)
 
