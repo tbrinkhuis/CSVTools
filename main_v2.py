@@ -7,13 +7,18 @@ import tkinter as tk
 from tkinter import ttk
 from tkinter import Menu, Menubutton, filedialog, messagebox
 from tkinter.ttk import *
-from tkinter.constants import DISABLED, N,S,E,W
+from tkinter.constants import DISABLED, FALSE, N,S,E,W
 
 
 import numpy as np
 import pandas as pd
 
 os.chdir(os.getcwd()) # change the directory to the current working dir
+
+
+regex_time = '(\d\d[:|.]\d\d[:|.]\d\d[:|.|+]\d\d\d|\d[:|.]\d\d[:|.]\d\d[:|.|+]\d\d\d|\d[:|.]\d\d[:|.]\d\d[:|.|+]\d\d|\d\d[:|.]\d\d[:|.]\d\d|\d[:|.]\d\d[:|.]\d\d)'
+regex_date = '(\d\d\d\d[-|.|/]\d\d[-|.|/]\d\d|\d\d[-|.|/]\d\d[-|.|/]\d\d|\d[-|.|/]\d\d[-|.|/]\d\d|\d\d[-|.|/]\d\d[-|.|/]\d\d|\d\d[-|.|/]\d\d[-|.|/]\d\d\d\d|\d[-|.|/]\d\d[-|.|/]\d\d\d\d|\d\d\d\d[-|.|/]\d\d[-|.|/]\d|\d\d[-|.|/]\d\d[-|.|/]\d)'
+
 
 window = tk.Tk()
 window.title('CatSV - CSV Tool') #window title
@@ -37,7 +42,7 @@ class cat:
         self.csv_list = [i for i in glob.glob('*.{}'.format('csv'))]
         return self.csv_list
 
-    def lst_to_upper(list_to_change): # Take a single dem. list and capitalize everything
+    def lst_to_upper(self, list_to_change): # Take a single dem. list and capitalize everything
         for i in list_to_change: 
             list_to_change[list_to_change.index(i)] = list_to_change[list_to_change.index(i)].upper()
         return list_to_change
@@ -56,7 +61,7 @@ class cat:
             os.startfile(os.curdir)
 
     def files_to_columns(self):
-        self.current_file_sel = w_lb_columns.curselection() # get a list of selected files
+        self.current_file_sel = w_lb_files.curselection() # get a list of selected files
         if self.current_file_sel: # if something is selected
             self.get_data(self.current_file_sel) # call get data function with the list of selected files
             files_in_dir = self.filenames() # return a list of CSV files in the CWD
@@ -64,9 +69,16 @@ class cat:
             print('nothing has been selected...')
             messagebox.showinfo("User Error", "Select a file to load!")
 
+
     def get_data(self, files): # get all of the data, concatinate and sort
-        rows_to_skip = int(round(w_spn_header_row.get())) # get the spinbox value and sub 1 since we need to skip 1 less row than the header
-        w_lb_columns.delete(0, 'end') # clear the listbox
+        try:
+            rows_to_skip = float(w_spn_header_row.get()) # get the spinbox value and sub 1 since we need to skip 1 less row than the header
+            rows_to_skip = int(rows_to_skip.__round__())
+            w_lb_columns.delete(0, 'end') # clear the listbox
+        except ValueError:
+            print('some wierd characters are hanging out in the header row spinbox')
+            messagebox.showwarning(title='Select a real row', message='Some wierd characters are hanging out in the header row spinbox! The row number must be and integer.')
+
         try:
             df = [pd.read_csv(w_lb_files.get(f), skiprows=(rows_to_skip)) for f in files] # read all of the csv files selected
         except:
@@ -74,8 +86,7 @@ class cat:
             messagebox.showerror(title='Failed to read files', message='Something went wrong in method get_data. The program was unable to read the selected file.')
 
         if df: # got df?
-
-            try:
+            # try:
                 self.concat_df = pd.concat(df, sort=False) # combine all csv files. This should combine any identical headers
                 self.header = list(self.concat_df) # get the header of the concatinated dataframe
 
@@ -85,6 +96,8 @@ class cat:
                 self.concat_df = self.concat_df[0:] # remove the header for replacement
                 self.concat_df.columns = self.header # load in the new header that is all caps. for searching reasons down the line
 
+                print('self.concat_df:')
+                print(self.concat_df)
         
                 w_lb_columns_var.set(self.header) # update the columns listbox. Done with the sorted DF so all self.header entrys are unique
                 w_dd_date_col['value'] = self.header
@@ -100,14 +113,106 @@ class cat:
                 self.header_time_col = self.lst_search(self.header, 'TIME')
                 if self.header_time_col:
                     w_dd_time_col.set(self.header_time_col)
-            except:
-                print('Something went wrong in get_data method. The program was unable to concatinate the dataframes')
-                messagebox.showerror(title='Failed to concatinate files', message='Something went wrong in get_data method. The program was unable to concatinate the files. This is usualy caused by combining files that do not share the same data structure.')
+
+                self.time_n_date()
+
+            # except:
+                # print('Something went wrong in get_data method. The program was unable to concatinate the dataframes')
+                # messagebox.showerror(title='Failed to concatinate files', message='Something went wrong in get_data method. The program was unable to concatinate the files. This is usualy caused by combining files that do not share the same data structure.')
 
         else:
             print('Something happened while trying to read the selected file. Make sure eveything \
                 selected starts on the same row and have the same timestamp headers')
             messagebox.showerror(title='Nothing in DF', message='Something went wrong in get_data method. While the program was able to read the files, nothing seems to be in the dataframe.')
+
+    def time_n_date(self):
+        self.date_col = w_dd_date_col.get()
+        self.time_col = w_dd_time_col.get()
+        print('self.concat_df:')
+        print(self.concat_df)
+
+        old_time_col = self.concat_df[self.time_col] # get the timestamp from the df so we can build datetime
+        new_time_col = old_time_col.str.extract(pat = regex_time)
+
+        old_date_col = self.concat_df[self.date_col]
+        new_date_col = old_date_col.str.extract(pat = regex_date)
+
+        new_timestamps = new_date_col[0] + ' ' + new_time_col[0] # combine the date and time into just the time col 
+        new_timestamps = pd.to_datetime(new_timestamps, infer_datetime_format=True) # convert new_timestamp object to datetime for use with resampling format='%m/%d/%Y %H:%M:%S'                                         
+
+        # print(f'New Time string: {new_timestamps}')
+    
+        self.concat_df[self.time_col] = new_timestamps # update the concatinated datafames timestamp column with clean time man
+        self.concat_df = self.concat_df.set_index(self.time_col).sort_index(ascending=True)   #.sort(self.time_col)
+        self.concat_df = self.concat_df.reset_index()
+
+        self.sorted_df = self.concat_df
+
+        print('self.sorted_df:')
+        print(self.sorted_df)
+
+    def header_sel_inv(self): 
+        # Get a list of columns that are not selected
+        # should be called after get_data and befor resampling
+        # this is to drop any unwanted data from the DF before performing interpolation
+        self.header_sel_col_inv = []
+        header_sel_col_index = w_lb_columns.curselection()
+        header_sel_col = [w_lb_columns.get(c) for c in header_sel_col_index] # get a list of all the selected items in the col listbox
+        for a in self.header: # Global var of the header
+            if a not in header_sel_col:  # this is inverting the list of selected columns and retuning one with eveything that was not selected so they can be dropped
+                print("Appending: " + a)
+                self.header_sel_col_inv.append(a)
+
+    def save_data(self):
+        dd_fill_type = w_dd_fill_type.get()
+        dd_time_col = w_dd_time_col.get()
+        self.header_sel_inv()
+        self.files_to_columns()
+
+        try:
+            self.sorted_df = self.sorted_df.drop(columns=self.header_sel_col_inv)
+            self.sorted_df = self.sorted_df.drop_duplicates(subset=dd_time_col) # drop any duplicate from the time col selected from the drop down
+        except:
+            print('Failed to drop columns and duplicates')
+
+        try:
+            print('180 sorted df:')
+            print(self.sorted_df)
+            print(dd_fill_type)
+            if dd_fill_type != 'No Samp/fill':
+                if 'Interpolate' in dd_fill_type:
+                    self.sorted_df = self.sorted_df.set_index(w_dd_time_col.get()).resample('100ms').interpolate() # resample the dataframe, this needs to be a multiple what the final rate will be. 
+                else:
+                    self.sorted_df = self.sorted_df.set_index(w_dd_time_col.get()).resample('100ms',).fillna(method=dd_fill_type)
+            
+                self.sorted_df = self.sorted_df.asfreq(freq=w_dd_sample_rate.get()) # grab this frequency of time from the resampled dataframe
+                self.sorted_df = self.sorted_df.reset_index() # reset the index so TIME is included in the save
+                self.sorted_df = self.sorted_df.round(10)
+                self.sorted_df.info(verbose=True)
+            self.concat_df = 0
+
+            
+
+        except:
+            print('resampling failed')
+            messagebox.showerror(title='Failed to resample', message='Something went wrong in save_data method. While saving your file, a problem was encountered while resampling your data.')
+ 
+        try:
+            self.sorted_df.to_csv('OUTPUT_FILE.csv', index=False) # , columns=col_lbl
+            self.sd(prompt=False)
+            # if messagebox.askyesnocancel("Success!", "Your file was saved! Would you like to open it?") == 'YES':
+            os.startfile('OUTPUT_FILE.csv') # open the newly saved file
+        except PermissionError:
+            print('Failed to write to file... :(')
+            messagebox.showinfo("Oh no! Permission denied!", "Your file failed to save, permission was denied!")
+        except:
+            print('Failed to write to file... :(')
+            messagebox.showinfo("Oh no! Something terrible has happened!", "The file failed to save.")
+
+    def b_save_date(self):
+        self.save_data()
+
+
 
 
 
@@ -138,16 +243,16 @@ w_b_sel_dir.grid(row=0, column=0, columnspan=2, padx=5, pady=5)
 w_header_row_lbl = Label(w_col_0, text='Header row:', anchor=E, width=14)
 w_header_row_lbl.grid(row=1,column=0, padx=5, pady=5)
 
-w_spn_header_row = Spinbox(w_col_0, from_=0, to=20, width=5, textvariable=14) 
+w_spn_header_row = Spinbox(w_col_0, from_=0, to=20, width=5) 
 w_spn_header_row.grid(row=1,column=1, padx=5, pady=5)
-w_spn_header_row.set(14)
+w_spn_header_row.set(13)
 
 # Select all files in listox
 w_b_select_all = Button(w_col_1, text='Select all', width=13)
 w_b_select_all.grid(row=2, column=0, padx=5, pady=5)
 
 # Import Button
-w_b_import = Button(w_col_0, text='Import', width=13, command=m.get_data)
+w_b_import = Button(w_col_0, text='Import', width=13, command=m.files_to_columns)
 w_b_import.grid(row=2, column=1, padx=5, pady=5)
 
 # Files listbox
@@ -168,7 +273,7 @@ w_lb_columns.grid(row=1, column=3, columnspan=2, rowspan=18, padx=5, pady=5, sti
 
 # Col 5 Row 0
 # Save selected button
-w_b_save = Button(w_col_2, text='Save Selected', width=button_width)
+w_b_save = Button(w_col_2, text='Save Selected', width=button_width, command=m.b_save_date)
 w_b_save.grid(row=0, column=5, padx=5, pady=5)
 
 # Graph button
@@ -209,14 +314,15 @@ w_sample_rate_lbl.grid(row=3, column=5, padx=5, pady=5)
 w_dd_sample_rate_var = tk.StringVar
 w_dd_sample_rate = ttk.Combobox(w_col_3, textvariable=w_dd_sample_rate_var, value=['30s','15s','10s','5s','1s','500ms','250ms','100ms'], width=combo_width)
 w_dd_sample_rate.grid(row=3, column=6, padx=5, pady=5)
-
+w_dd_sample_rate.set('30s')
 
 w_fill_type_lbl = Label(w_col_3, text='Fill Method:', anchor=E, width=lbl_width)
 w_fill_type_lbl.grid(row=3, column=7, padx=5, pady=5)
 
 w_dd_fill_type_var = tk.StringVar
-w_dd_fill_type = ttk.Combobox(w_col_3, textvariable=w_dd_fill_type_var, value=['interpolate', 'backfill', 'forward fill', 'Zero Fill', 'NaN Fill'], width=combo_width)
+w_dd_fill_type = ttk.Combobox(w_col_3, textvariable=w_dd_fill_type_var, value=['Interpolate', 'backfill', 'ffill', 'pad', 'No Samp/fill'], width=combo_width)
 w_dd_fill_type.grid(row=3, column=8, padx=5, pady=5)
+w_dd_fill_type.set('Interpolate')
 
 
 w_sep_alpha_settings = Label(w_col_3, text='----------Alpha Settings----------------------------------------------------------------------------------', width=72)
