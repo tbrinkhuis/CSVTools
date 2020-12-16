@@ -88,17 +88,17 @@ class cat:
 
         if df: # got df?
             # try:
-                self.concat_df = pd.concat(df, sort=False) # combine all csv files. This should combine any identical headers
-                self.header = list(self.concat_df) # get the header of the concatinated dataframe
+                concat_df = pd.concat(df, sort=False) # combine all csv files. This should combine any identical headers
+                self.header = list(concat_df) # get the header of the concatinated dataframe
 
                 # print(self.header)
 
                 self.header = self.lst_to_upper(self.header) # upper case everything in da list
-                self.concat_df = self.concat_df[0:] # remove the header for replacement
-                self.concat_df.columns = self.header # load in the new header that is all caps. for searching reasons down the line
+                concat_df = concat_df[0:] # remove the header for replacement
+                concat_df.columns = self.header # load in the new header that is all caps. for searching reasons down the line
 
-                print('self.concat_df:')
-                print(self.concat_df)
+                print('concat_df:')
+                print(concat_df)
         
                 w_lb_columns_var.set(self.header) # update the columns listbox. Done with the sorted DF so all self.header entrys are unique
                 w_dd_date_col['value'] = self.header
@@ -115,8 +115,8 @@ class cat:
                 if self.header_time_col:
                     w_dd_time_col.set(self.header_time_col)
 
-                self.time_n_date()
-
+                self.time_n_date(concat_df)
+                concat_df = 0
             # except:
                 # print('Something went wrong in get_data method. The program was unable to concatinate the dataframes')
                 # messagebox.showerror(title='Failed to concatinate files', message='Something went wrong in get_data method. The program was unable to concatinate the files. This is usualy caused by combining files that do not share the same data structure.')
@@ -126,16 +126,17 @@ class cat:
                 selected starts on the same row and have the same timestamp headers')
             messagebox.showerror(title='Nothing in DF', message='Something went wrong in get_data method. While the program was able to read the files, nothing seems to be in the dataframe.')
 
-    def time_n_date(self):
+    def time_n_date(self, df1):
         self.date_col = w_dd_date_col.get()
         self.time_col = w_dd_time_col.get()
-        print('self.concat_df:')
-        print(self.concat_df)
+        df = df1
+        print('concat_df:')
+        print(df)
 
-        old_time_col = self.concat_df[self.time_col] # get the timestamp from the df so we can build datetime
+        old_time_col = df[self.time_col] # get the timestamp from the df so we can build datetime
         new_time_col = old_time_col.str.extract(pat = regex_time)
 
-        old_date_col = self.concat_df[self.date_col]
+        old_date_col = df[self.date_col]
         new_date_col = old_date_col.str.extract(pat = regex_date)
 
         new_timestamps = new_date_col[0] + ' ' + new_time_col[0] # combine the date and time into just the time col 
@@ -143,11 +144,11 @@ class cat:
 
         # print(f'New Time string: {new_timestamps}')
     
-        self.concat_df[self.time_col] = new_timestamps # update the concatinated datafames timestamp column with clean time man
-        self.concat_df = self.concat_df.set_index(self.time_col).sort_index(ascending=True)   #.sort(self.time_col)
-        self.concat_df = self.concat_df.reset_index()
+        df[self.time_col] = new_timestamps # update the concatinated datafames timestamp column with clean time man
+        df = df.set_index(self.time_col).sort_index(ascending=True)   #.sort(self.time_col)
+        df = df.reset_index(drop=True)
 
-        self.sorted_df = self.concat_df
+        self.sorted_df = df
 
         print('self.sorted_df:')
         print(self.sorted_df)
@@ -164,29 +165,29 @@ class cat:
                 print("Appending: " + a)
                 self.header_sel_col_inv.append(a)
 
-    def save_data(self):
+    def save_data(self, df1):
         dd_time_col = w_dd_time_col.get()
+        
         self.header_sel_inv()
-        self.files_to_columns()
+        # self.files_to_columns()
 
-        try:
-            self.sorted_df = self.sorted_df.drop(columns=self.header_sel_col_inv)
-            self.sorted_df = self.sorted_df.drop_duplicates(subset=dd_time_col) # drop any duplicate from the time col selected from the drop down
-        except:
-            print('Failed to drop columns and duplicates')
+        # try:
+        df = df1.drop(columns=self.header_sel_col_inv)
+        df = df.drop_duplicates(subset=dd_time_col) # drop any duplicate from the time col selected from the drop down
+    # except:
+        print('Failed to drop columns and duplicates')
 
-        try:
-            print('180 sorted df:')
-            print(self.sorted_df)
-            print(dd_fill_type)
-            self.resample_data()
-            self.concat_df = 0
-        except:
-            print('resampling failed')
-            messagebox.showerror(title='Failed to resample', message='Something went wrong in save_data method. While saving your file, a problem was encountered while resampling your data.')
+    # try:
+        print('180 sorted df:')
+        print(df)
+        print(dd_fill_type)
+        df = self.resample_data(df)
+    # except:
+        print('resampling failed')
+        messagebox.showerror(title='Failed to resample', message='Something went wrong in save_data method. While saving your file, a problem was encountered while resampling your data.')
  
         try:
-            self.resampled_df.to_csv('OUTPUT_FILE.csv', index=False) # , columns=col_lbl
+            df.to_csv('OUTPUT_FILE.csv', index=False) # , columns=col_lbl
             self.sd(prompt=False)
             os.startfile('OUTPUT_FILE.csv') # open the newly saved file
         except PermissionError:
@@ -196,42 +197,50 @@ class cat:
             print('Failed to write to file... :(')
             messagebox.showinfo("Oh no! Something terrible has happened!", "The file failed to save.")
 
-    def resample_data(self):
+    def resample_data(self, df1):
         #must be called before files_to_col
-        self.resampled_df = self.sorted_df
-        if w_dd_fill_type.get() != 'No Samp/fill':
-            if 'Interpolate' in w_dd_fill_type.get():
-                self.resampled_df = self.resampled_df.set_index(w_dd_time_col.get()).resample('100ms').interpolate() # resample the dataframe, this needs to be a multiple what the final rate will be. 
-            else:
-                self.resampled_df = self.resampled_df.set_index(w_dd_time_col.get()).resample('100ms',).fillna(method=w_dd_fill_type.get())
-        
-            self.resampled_df = self.resampled_df.asfreq(freq=w_dd_sample_rate.get()) # grab this frequency of time from the resampled dataframe
-            self.resampled_df = self.resampled_df.reset_index() # reset the index so TIME is included in the save
-            self.resampled_df = self.resampled_df.round(10)
-            self.resampled_df.info(verbose=True)
+        df = df1.reset_index(drop=True)
+        # if w_dd_fill_type.get() != 'No Samp/fill':
+        if 'Interpolate' in w_dd_fill_type.get():
+            df = df.set_index(w_dd_time_col.get()).resample('100ms').interpolate() # resample the dataframe, this needs to be a multiple what the final rate will be. 
+        else:
+            df = df.set_index(w_dd_time_col.get()).resample('100ms',).fillna(method=w_dd_fill_type.get())
+    
+        df = df.asfreq(freq=w_dd_sample_rate.get()) # grab this frequency of time from the resampled dataframe
+        df = df.reset_index(drop=True) # reset the index so TIME is included in the save
+        df = df.round(10)
+        df.info(verbose=True)
+        return df
         
 
-    def graph_data(self, dpi=100, figsize=(11,7)):
-        self.resample_data()
-        self.files_to_columns()
+    def graph_data(self, df1, dpi=100, figsize=(11,7)):
+        df = self.resample_data(df1)
+        df = df.reset_index(drop=True)
+        print(df)
+        df = df.drop_duplicates(subset=w_dd_time_col.get())
         header_sel_col_index = w_lb_columns.curselection()
         header_sel_col = [w_lb_columns.get(c) for c in header_sel_col_index]
 
         lc = 0
-        while lc < len(header_sel_col):
-            if w_dd_time_col.get() in header_sel_col[lc]:
-                header_sel_col.pop(lc)
-            lc += 1
+        try:
+            while lc < len(header_sel_col):
+                if w_dd_time_col.get() in header_sel_col[lc]:
+                    header_sel_col.pop(lc)
+                lc += 1
+        except KeyError:
+            pass
         print(header_sel_col)
         
-        self.resampled_df.plot(x=w_dd_time_col.get(), y=header_sel_col)
+        df.plot(y=header_sel_col)
         plt.show()
 
     def b_save_date(self):
-        self.save_data()
+        self.save_data(self.sorted_df)
 
     def b_graph_data(self):
-        self.graph_data()
+        print('b_graph')
+        print(self.sorted_df)
+        self.graph_data(self.sorted_df)
 
 
 
