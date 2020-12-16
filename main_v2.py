@@ -8,6 +8,7 @@ from tkinter import ttk
 from tkinter import Menu, Menubutton, filedialog, messagebox
 from tkinter.ttk import *
 from tkinter.constants import DISABLED, FALSE, N,S,E,W
+import matplotlib.pyplot as plt
 
 
 import numpy as np
@@ -164,7 +165,6 @@ class cat:
                 self.header_sel_col_inv.append(a)
 
     def save_data(self):
-        dd_fill_type = w_dd_fill_type.get()
         dd_time_col = w_dd_time_col.get()
         self.header_sel_inv()
         self.files_to_columns()
@@ -179,28 +179,15 @@ class cat:
             print('180 sorted df:')
             print(self.sorted_df)
             print(dd_fill_type)
-            if dd_fill_type != 'No Samp/fill':
-                if 'Interpolate' in dd_fill_type:
-                    self.sorted_df = self.sorted_df.set_index(w_dd_time_col.get()).resample('100ms').interpolate() # resample the dataframe, this needs to be a multiple what the final rate will be. 
-                else:
-                    self.sorted_df = self.sorted_df.set_index(w_dd_time_col.get()).resample('100ms',).fillna(method=dd_fill_type)
-            
-                self.sorted_df = self.sorted_df.asfreq(freq=w_dd_sample_rate.get()) # grab this frequency of time from the resampled dataframe
-                self.sorted_df = self.sorted_df.reset_index() # reset the index so TIME is included in the save
-                self.sorted_df = self.sorted_df.round(10)
-                self.sorted_df.info(verbose=True)
+            self.resample_data()
             self.concat_df = 0
-
-            
-
         except:
             print('resampling failed')
             messagebox.showerror(title='Failed to resample', message='Something went wrong in save_data method. While saving your file, a problem was encountered while resampling your data.')
  
         try:
-            self.sorted_df.to_csv('OUTPUT_FILE.csv', index=False) # , columns=col_lbl
+            self.resampled_df.to_csv('OUTPUT_FILE.csv', index=False) # , columns=col_lbl
             self.sd(prompt=False)
-            # if messagebox.askyesnocancel("Success!", "Your file was saved! Would you like to open it?") == 'YES':
             os.startfile('OUTPUT_FILE.csv') # open the newly saved file
         except PermissionError:
             print('Failed to write to file... :(')
@@ -209,10 +196,42 @@ class cat:
             print('Failed to write to file... :(')
             messagebox.showinfo("Oh no! Something terrible has happened!", "The file failed to save.")
 
+    def resample_data(self):
+        #must be called before files_to_col
+        self.resampled_df = self.sorted_df
+        if w_dd_fill_type.get() != 'No Samp/fill':
+            if 'Interpolate' in w_dd_fill_type.get():
+                self.resampled_df = self.resampled_df.set_index(w_dd_time_col.get()).resample('100ms').interpolate() # resample the dataframe, this needs to be a multiple what the final rate will be. 
+            else:
+                self.resampled_df = self.resampled_df.set_index(w_dd_time_col.get()).resample('100ms',).fillna(method=w_dd_fill_type.get())
+        
+            self.resampled_df = self.resampled_df.asfreq(freq=w_dd_sample_rate.get()) # grab this frequency of time from the resampled dataframe
+            self.resampled_df = self.resampled_df.reset_index() # reset the index so TIME is included in the save
+            self.resampled_df = self.resampled_df.round(10)
+            self.resampled_df.info(verbose=True)
+        
+
+    def graph_data(self, dpi=100, figsize=(11,7)):
+        self.resample_data()
+        self.files_to_columns()
+        header_sel_col_index = w_lb_columns.curselection()
+        header_sel_col = [w_lb_columns.get(c) for c in header_sel_col_index]
+
+        lc = 0
+        while lc < len(header_sel_col):
+            if w_dd_time_col.get() in header_sel_col[lc]:
+                header_sel_col.pop(lc)
+            lc += 1
+        print(header_sel_col)
+        
+        self.resampled_df.plot(x=w_dd_time_col.get(), y=header_sel_col)
+        plt.show()
+
     def b_save_date(self):
         self.save_data()
 
-
+    def b_graph_data(self):
+        self.graph_data()
 
 
 
@@ -277,7 +296,7 @@ w_b_save = Button(w_col_2, text='Save Selected', width=button_width, command=m.b
 w_b_save.grid(row=0, column=5, padx=5, pady=5)
 
 # Graph button
-w_b_graph = Button(w_col_2, text='Graph Selected', width=button_width)
+w_b_graph = Button(w_col_2, text='Graph Selected', width=button_width, command=m.b_graph_data)
 w_b_graph.grid(row=0, column=6, padx=5, pady=5)
 
 # Gen Alpha Button
@@ -312,7 +331,7 @@ w_sample_rate_lbl = Label(w_col_3, text='Sample Rate:', anchor=E, width=lbl_widt
 w_sample_rate_lbl.grid(row=3, column=5, padx=5, pady=5)
 
 w_dd_sample_rate_var = tk.StringVar
-w_dd_sample_rate = ttk.Combobox(w_col_3, textvariable=w_dd_sample_rate_var, value=['30s','15s','10s','5s','1s','500ms','250ms','100ms'], width=combo_width)
+w_dd_sample_rate = ttk.Combobox(w_col_3, textvariable=w_dd_sample_rate_var, value=['30s','15s','10s','5s','1s','500ms','100ms'], width=combo_width)
 w_dd_sample_rate.grid(row=3, column=6, padx=5, pady=5)
 w_dd_sample_rate.set('30s')
 
