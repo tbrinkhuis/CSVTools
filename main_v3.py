@@ -31,12 +31,14 @@ window.geometry('1100x768') # window size Should be 383x378. If the users has cu
 class cat:
 
     def __init__(self):
-        print("in init")
+        pd.set_option('display.max_columns', None)
+        pd.set_option('display.width', None)
+        pd.set_option('display.max_colwidth', None)
         
-    def sd(self, prompt=True): #select directory, call fil dialog box
+    def sd(self, prompt=False): #select directory, call fil dialog box
         if prompt:
             self.selected_dir = os.chdir(filedialog.askdirectory(title = "Select the folder that contains your CSV trend files"))
-        # self.selected_dir = os.chdir(os.getcwd())
+        self.selected_dir = os.chdir('C://Users//accou//Desktop//CatSV//Concat test//test_data')
         w_lb_files_var.set(self.filenames())
 
     def filenames(self): # get csv file list from the cur dir.
@@ -70,51 +72,19 @@ class cat:
             print('nothing has been selected...')
             messagebox.showinfo("User Error", "Select a file to load!")
 
-
-    def time_n_date(self, df1):
-        date_col = w_dd_date_col.get()
-        time_col = w_dd_time_col.get()
-        df = df1
-        print('timendate pre:')
-        print(df)
-
-        old_time_col = df[time_col].tolist() # get the timestamp from the df so we can build datetime
+    def time_format(self, df_time_col):
+        old_time_col = df_time_col.tolist() # get the timestamp from the df so we can build datetime
         old_time_col = pd.Series(old_time_col)
         new_time_col = old_time_col.str.extract(pat = regex_time)
+        return new_time_col
 
-        old_date_col = df[date_col].tolist()
+    def date_format(self, df_date_col):
+        old_date_col = df_date_col.tolist() # get the timestamp from the df so we can build datetime
         old_date_col = pd.Series(old_date_col)
         new_date_col = old_date_col.str.extract(pat = regex_date)
+        return new_date_col
 
-        df[time_col] = pd.to_datetime(new_date_col[0] + ' ' + new_time_col[0], infer_datetime_format=True) # convert new_timestamp object to datetime for use with resampling format='%m/%d/%Y %H:%M:%S'                                         
-
-        print('timendate post:')
-        print(df.info())
-        # df = df.reset_index(drop=True)
-        return df
-        # self.sorted_df = df
-
-        # print('self.sorted_df:')
-        # print(self.sorted_df)
-
-    # def resample_data(self, df1):
-    #     #must be called before files_to_col
-    #     df = df1.reset_index(drop=True)
-    #     # if w_dd_fill_type.get() != 'No Samp/fill':
-    #     if w_dd_fill_type.get() == 'Interpolate':
-    #         df = df.set_index(w_dd_time_col.get()).resample('100ms').interpolate() # resample the dataframe, this needs to be a multiple what the final rate will be. 
-    #     else:
-    #         df = df.set_index(w_dd_time_col.get()).resample('100ms',).fillna(method=w_dd_fill_type.get())
-    
-    #     df = df.asfreq(freq=w_dd_sample_rate.get()) # grab this frequency of time from the resampled dataframe
-    #     df = df.reset_index(drop=True) # reset the index so TIME is included in the save
-    #     df = df.round(10)
-    #     df.info(verbose=True)
-    #     return df
-
-
-
-    def get_data(self, files): # get all of the data, concatinate and sort
+    def get_data(self, selected_files): # get all of the data, concatinate and sort
         try:
             rows_to_skip = float(w_spn_header_row.get()) # get the spinbox value and sub 1 since we need to skip 1 less row than the header
             rows_to_skip = int(rows_to_skip.__round__())
@@ -123,55 +93,99 @@ class cat:
             print('some wierd characters are hanging out in the header row spinbox')
             messagebox.showwarning(title='Select a real row', message='Some wierd characters are hanging out in the header row spinbox! The row number must be and integer.')
 
-        try:
-            df = [pd.read_csv(w_lb_files.get(f), skiprows=(rows_to_skip),  encoding ='UTF8') for f in files] # read all of the csv files selected
-        except:
-            print('Something went wrong in method get_data. The program was unable to read the selected file')
-            messagebox.showerror(title='Failed to read files', message='Something went wrong in method get_data. The program was unable to read the selected file.')
+        # try:
+        df_list = [] # the list all of the dataframes will be put into
+        reject_list = [] # a list of the files, if any, that have been rejected because they do not have date or time info. Used for the message box
+        for row_index in selected_files:
+            print(f'Selected file inedexs: {row_index}')
 
-        if df: # got df?
-            # try:
-                df = pd.concat(df, sort=False) # combine all csv files. This should combine any identical headers
-                self.header = list(df) # get the header of the concatinated dataframe
+        # this whole loop is to find the date and time columns and format them correctly. 
+        # if you dont do this identical time points will not combine because the timestamp 
+        # is not formated in the same way.
+        for row_index in selected_files:
+            # for each item selected in the files listbox
+            file_name = w_lb_files.get(row_index) # get the value from the row index
+            print(file_name) 
+            file_contents_df = pd.read_csv(file_name, skiprows=(rows_to_skip)) # read the current file
+            file_contents_df_header = list(file_contents_df)
+            file_contents_df_header = self.lst_to_upper(file_contents_df_header)
+            file_contents_df = file_contents_df[0:] # remove the header for replacement
+            file_contents_df.columns = file_contents_df_header # load in the new header that is all caps. for searching reasons down the line
+            dt_col_search = file_contents_df.tail(1) # get the last row 
+            dt_col_search = dt_col_search.values.tolist() # convert the  last df row into a list
+            dt_col_search = pd.Series(dt_col_search[0]) # convert the list into a pd series so we can do a regex search of all the items
+            time_col_result = dt_col_search.str.contains(regex_time) # use regnex to identify if the column matches a known time format
+            date_col_result = dt_col_search.str.contains(regex_date) # use regnex to identify if the column matches a known date format
 
-                # print(self.header)
+            # print(f'Date Search results: \n{date_col_result}')
+            # print(f'Time Search results: \n{time_col_result}')
 
-                self.header = self.lst_to_upper(self.header) # upper case everything in da list
-                df = df[0:] # remove the header for replacement
-                df.columns = self.header # load in the new header that is all caps. for searching reasons down the line
+            time_index_count = 0
+            time_col = 0
+            for t in time_col_result: # get the index of any found timestamps
+                if t == True:
+                    time_col = file_contents_df_header[time_index_count]
+                time_index_count += 1
 
-                print('df:')
-                print(df)
-        
-                w_lb_columns_var.set(self.header) # update the columns listbox. Done with the sorted DF so all self.header entrys are unique
-                w_dd_date_col['value'] = self.header
-                w_dd_time_col['value'] = self.header
-                w_dd_target_col['value'] = self.header
-                w_dd_temp_col['value'] = self.header
+            date_index_count = 0
+            date_col = 0
+            for d in date_col_result: 
+                if d == True:
+                    date_col = file_contents_df_header[date_index_count]
+                    # print(f'date_index: {date_index_count}')
+                date_index_count += 1
 
-                # If the dat or time search came back with results, change the drop downs to those columns so the user does not have to
-                self.header_date_col = self.lst_search(self.header, 'DATE')
-                if self.header_date_col:
-                    w_dd_date_col.set(self.header_date_col)
+            if (time_col) and (date_col): # if the file contains both date and time info then load in new formated time and dates, create a new datetime index, and append the file into the df_list
+                new_time_col = self.time_format(file_contents_df[time_col]) # reformat time
+                new_date_col = self.date_format(file_contents_df[date_col]) # reformat date
+                # print(f'~183 - New Date Col: \n {new_date_col}')
 
-                self.header_time_col = self.lst_search(self.header, 'TIME')
-                if self.header_time_col:
-                    w_dd_time_col.set(self.header_time_col)
+                file_contents_df[time_col] = new_time_col # load the modified time into the df
+                file_contents_df[date_col] = new_date_col # load the modified date into the df
+                new_datetime_index = file_contents_df[date_col] + ' ' + file_contents_df[time_col] # make the new datetime index, this gives and indexable item for pd to use. This is done
+                                                                                                   # so the dataframes will concatinate properly
 
-                self.concat_df = self.time_n_date(df)
+                file_contents_df['datetime_index'] = pd.to_datetime(new_datetime_index, infer_datetime_format=True) # format the column as datetime so that it is indexable
+                file_contents_df = file_contents_df.set_index('datetime_index') # set the datetime_index as the index
+                # print(f'{file_name}: \n {file_contents_df} \n -------------------------------------------------------------------------')
+                df_list.append(file_contents_df) # add the df to out df_list
+            else:
+                reject_list.append(file_name) # if time and date are not found, then add the filename to this list.
 
+        if reject_list:
+            messagebox.showwarning(title='Missing timestamp info', message=f'The following files were not loaded because they are missing timestamp information: {reject_list}')
 
+        if df_list: # got df?
+        #     # try:
+            df = pd.concat(df_list, sort=False) # combine all csv files. This combine any like columns
+            df = df.drop_duplicates(subset=time_col, keep='first') # drop any duplicate times. if this is not done, there can be problems with resampling
+            self.header = list(df) # get the header of the concatinated dataframe
 
-                # return concat_df
-                # concat_df = 0
+            # print('Concat df:')
+            # print(df)
+            # df.to_csv('output.csv')
+
+            w_lb_columns_var.set(self.header) # update the columns listbox. Done with the sorted DF so all self.header entrys are unique
+            w_dd_date_col['value'] = self.header # fill the drop downs with all of the column names.
+            w_dd_time_col['value'] = self.header
+            w_dd_target_col['value'] = self.header
+            w_dd_temp_col['value'] = self.header
+
+            # If the date or time search came back with results, change the drop downs to those columns so the user does not have to
+            if date_col:
+                w_dd_date_col.set(date_col)
+            if time_col:
+                w_dd_time_col.set(time_col)
+
+            self.concat_df = df
             # except:
                 # print('Something went wrong in get_data method. The program was unable to concatinate the dataframes')
                 # messagebox.showerror(title='Failed to concatinate files', message='Something went wrong in get_data method. The program was unable to concatinate the files. This is usualy caused by combining files that do not share the same data structure.')
 
-        else:
-            print('Something happened while trying to read the selected file. Make sure eveything \
-                selected starts on the same row and have the same timestamp headers')
-            messagebox.showerror(title='Nothing in DF', message='Something went wrong in get_data method. While the program was able to read the files, nothing seems to be in the dataframe.')
+        # else:
+        #     print('Something happened while trying to read the selected file. Make sure eveything \
+        #         selected starts on the same row and have the same timestamp headers')
+        #     messagebox.showerror(title='Nothing in DF', message='Something went wrong in get_data method. While the program was able to read the files, nothing seems to be in the dataframe.')
 
     def header_sel_inv(self): 
         # Get a list of columns that are not selected
@@ -239,8 +253,8 @@ class cat:
        
 
     def graph_data(self, df1, dpi=100, figsize=(11,7)):
-        df = self.resample_data(df1)
-        df = df.reset_index(drop=True)
+        df = self.resample_data(df1, w_dd_sample_rate.get())
+        # df = df.reset_index(drop=True)
         print(df)
         # df = df.drop_duplicates(subset=time_col, keep="first")
         header_sel_col_index = w_lb_columns.curselection()
@@ -262,10 +276,10 @@ class cat:
     def b_save_date(self):
         self.save_data(self.concat_df)
 
-    # def b_graph_data(self):
-    #     print('b_graph')
-    #     print(self.sorted_df)
-    #     self.graph_data(self.sorted_df)
+    def b_graph_data(self):
+        print('b_graph')
+        print(self.concat_df)
+        self.graph_data(self.concat_df)
 
 
 
@@ -330,7 +344,7 @@ w_b_save = Button(w_col_2, text='Save Selected', width=button_width, command=m.b
 w_b_save.grid(row=0, column=5, padx=5, pady=5)
 
 # Graph button
-w_b_graph = Button(w_col_2, text='Graph Selected', width=button_width)
+w_b_graph = Button(w_col_2, text='Graph Selected', width=button_width, command=m.b_graph_data)
 w_b_graph.grid(row=0, column=6, padx=5, pady=5)
 
 # Gen Alpha Button
